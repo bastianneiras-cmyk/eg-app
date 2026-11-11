@@ -93,6 +93,16 @@
           localStorage.setItem(m.k, String(m.v));
         } else if (m.accion === 'borrar' && /^eg_/.test(m.k)) {
           localStorage.removeItem(m.k);
+        } else if (m.accion === 'compartir') {
+          // Compartir el enlace de instalación: solo se permite compartir ESTA página
+          var fuente = e.source;
+          var responder = function (ok) { fuente.postMessage({ eg: 1, accion: 'compartido', ok: ok }, destino); };
+          var d = m.datos || {};
+          var url = location.href.split('?')[0].split('#')[0];
+          if (!navigator.share) { responder(false); return; }
+          fuente.postMessage({ eg: 1, accion: 'compartiendo' }, destino);   // aviso inmediato
+          navigator.share({ title: String(d.title || document.title), text: String(d.text || ''), url: url })
+            .then(function () { responder(true); }, function (err) { responder(!!err && err.name === 'AbortError'); });
         }
       } catch (err) { /* almacenamiento bloqueado: la app sigue funcionando sin recordar */ }
     });
