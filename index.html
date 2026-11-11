@@ -58,8 +58,44 @@
       marco.addEventListener('load', ocultarSplash);
       // Por si el evento load no llega (red lenta), no dejar el splash pegado
       setTimeout(ocultarSplash, 20000);
-      marco.src = APP_URL;
+      // "?v=hora" obliga a pedir siempre la versión publicada más reciente (sin copia guardada)
+      marco.src = APP_URL + '?v=' + Date.now();
     }
+
+    // ---------------------------------------------------------------------------
+    // Almacén para la app: en el iPhone la app corre dentro de un marco de Google y
+    // iOS borra lo que ese marco guarda (por eso pedía iniciar sesión cada vez).
+    // Esta página sí conserva sus datos: la app le pide guardar y leer aquí
+    // la sesión y el borrador (claves que empiezan con "eg_").
+    // ---------------------------------------------------------------------------
+    function esDeLaApp(w) {
+      for (var i = 0; i < 4 && w; i++) {          // la app está 1-2 marcos más adentro
+        if (w === marco.contentWindow) return true;
+        if (w === w.parent) break;
+        w = w.parent;
+      }
+      return false;
+    }
+    window.addEventListener('message', function (e) {
+      var m = e.data;
+      if (!m || m.eg !== 1 || !esDeLaApp(e.source)) return;
+      if (!/^(https:\/\/[\w.-]+\.googleusercontent\.com|https:\/\/script\.google\.com|null)$/.test(e.origin)) return;
+      var destino = e.origin === 'null' ? '*' : e.origin;
+      try {
+        if (m.accion === 'leer') {
+          var datos = {};
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (/^eg_/.test(k)) datos[k] = localStorage.getItem(k);
+          }
+          e.source.postMessage({ eg: 1, accion: 'datos', datos: datos }, destino);
+        } else if (m.accion === 'guardar' && /^eg_/.test(m.k)) {
+          localStorage.setItem(m.k, String(m.v));
+        } else if (m.accion === 'borrar' && /^eg_/.test(m.k)) {
+          localStorage.removeItem(m.k);
+        }
+      } catch (err) { /* almacenamiento bloqueado: la app sigue funcionando sin recordar */ }
+    });
   </script>
 </body>
 </html>
